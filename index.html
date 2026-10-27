@@ -28,6 +28,7 @@
             act() { this.x += this.vx; this.vy += 0.25; this.y += this.vy; this.alfa -= 0.02; }
             dib() { ctx.save(); ctx.globalAlpha = this.alfa; ctx.fillStyle = this.col; ctx.fillRect(this.x, this.y, this.size, this.size); ctx.restore(); }
         }
+
         class PixelAvatar {
             constructor(id, nombre) {
                 this.id = id; this.nombre = nombre;
@@ -116,10 +117,9 @@
                 }
             }
         }
-        
+
         function bucle() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            dibujarInterfazAyuda();
             const ahora = Date.now();
             for (let id in avatares) {
                 const av = avatares[id];
@@ -138,8 +138,10 @@
 
         const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
         ws.onopen = () => {
-            ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
-            ws.send('NICK justinfan99823'); ws.send(`JOIN #${canal}`);
+            ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands\r\n');
+            ws.send('PASS anonymous\r\n');
+            ws.send('NICK justinfan12984\r\n');
+            ws.send(`JOIN #${canal}\r\n`);
         };
         ws.onmessage = (ev) => {
             const msg = ev.data;
@@ -169,7 +171,7 @@
                     p.saltar(); if (p.velX === 0) p.velX = Math.random() > 0.5 ? 0.7 : -0.7;
                 }
             }
-            if (msg.startsWith('PING')) ws.send('PONG :tmi.twitch.tv');
+            if (msg.startsWith('PING')) ws.send('PONG :tmi.twitch.tv\r\n');
         };
     </script>
 </body>

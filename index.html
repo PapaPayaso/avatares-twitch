@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Pixel Art Avatars - PapaPayaso</title>
+    <title>Pixel Art Avatars Interactivos - PapaPayaso</title>
     <style>
         body, html {
             margin: 0;
@@ -16,7 +16,7 @@
             display: block;
             width: 100%;
             height: 100%;
-            image-rendering: pixelated; /* Mantiene el look retro de consola antigua */
+            image-rendering: pixelated; /* Look retro de 8 bits */
         }
     </style>
 </head>
@@ -29,7 +29,6 @@
         const canvas = document.getElementById('canvasStream');
         const ctx = canvas.getContext('2d');
 
-        // Ajustar resolución del lienzo
         function ajustarPantalla() {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
@@ -37,43 +36,74 @@
         ajustarPantalla();
         window.addEventListener('resize', ajustarPantalla);
 
-        // Almacén de avatares activos
         const avatares = {};
+        const particulas = [];
 
-        // Clase principal para dibujar y mover cada muñeco Pixel Art
+        // Clase para las partículas de la explosión
+        class ParticulaPixel {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.vx = (Math.random() - 0.5) * 7;
+                this.vy = (Math.random() - 0.8) * 9;
+                this.size = Math.random() * 3 + 2;
+                this.alfa = 1;
+                this.gravedad = 0.25;
+            }
+            actualizar() {
+                this.x += this.vx;
+                this.vy += this.gravedad;
+                this.y += this.vy;
+                this.alfa -= 0.02;
+            }
+            dibujar() {
+                ctx.save();
+                ctx.globalAlpha = this.alfa;
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.size, this.size);
+                ctx.restore();
+            }
+        }
+
+        // Clase principal del Avatar
         class PixelAvatar {
             constructor(id, nombre) {
                 this.id = id;
                 this.nombre = nombre;
                 this.x = Math.random() * (canvas.width - 60);
-                // Camina justo en el borde inferior (suelo simulado)
                 this.y = canvas.height - 85; 
                 this.velocidad = (Math.random() * 0.8 + 0.4) * (Math.random() > 0.5 ? 1 : -1);
                 this.altoSalto = 0;
                 this.velocidadY = 0;
                 this.enElSuelo = true;
                 this.timerVida = Date.now();
+                this.explotando = false;
                 
-                // Matriz de color aleatoria única para este usuario
+                // Estados de escala y pelea
+                this.escala = 1.0;
+                this.peleando = false;
+                this.timerPelea = 0;
+
                 this.colorCuerpo = `hsl(${Math.random() * 360}, 85%, 55%)`;
                 this.colorDetalle = `hsl(${Math.random() * 360}, 90%, 40%)`;
-
-                // Animación de caminata básica por software
                 this.offsetPierna = 0;
             }
 
             actualizar() {
-                // Actualizar posición X (Caminar)
+                if (this.explotando) return;
+
                 this.x += this.velocidad;
                 
-                // Rebotar en los bordes de la pantalla
+                // Rebotar bordes teniendo en cuenta la escala de tamaño
+                const anchoActual = 50 * this.escala;
                 if (this.x < 0) { this.x = 0; this.velocidad *= -1; }
-                if (this.x > canvas.width - 50) { this.x = canvas.width - 50; this.velocidad *= -1; }
+                if (this.x > canvas.width - anchoActual) { this.x = canvas.width - anchoActual; this.velocidad *= -1; }
 
-                // Física básica para el comando de Salto (!saltar)
+                // Física de salto
                 if (!this.enElSuelo) {
                     this.altoSalto += this.velocidadY;
-                    this.velocidadY -= 0.5; // Gravedad simulada
+                    this.velocidadY -= 0.5; 
                     if (this.altoSalto <= 0) {
                         this.altoSalto = 0;
                         this.velocidadY = 0;
@@ -81,88 +111,157 @@
                     }
                 }
 
-                // Oscilación de piernas al moverse
+                // Piernas animadas
                 if (Math.abs(this.velocidad) > 0.1) {
-                    this.offsetPierna = Math.sin(Date.now() * 0.01) * 4;
+                    this.offsetPierna = Math.sin(Date.now() * 0.015) * 4;
                 } else {
                     this.offsetPierna = 0;
+                }
+
+                // Controlar estado de ataque !pelea
+                if (this.peleando && Date.now() > this.timerPelea) {
+                    this.peleando = false;
                 }
             }
 
             dibujar() {
+                if (this.explotando) return;
+
                 const posX = this.x;
                 const posY = this.y - this.altoSalto;
 
                 ctx.save();
-
-                // 1. DIBUJAR CUERPO PIXEL ART (Matriz de 8x8 píxeles simulada mediante bloques planos)
-                ctx.fillStyle = this.colorCuerpo;
-                ctx.fillRect(posX + 8, posY + 16, 32, 24); // Torso
-
-                ctx.fillStyle = this.colorDetalle;
-                ctx.fillRect(posX + 12, posY + 4, 24, 14); // Cabeza
                 
-                // Ojos robóticos brillantes (blancos)
+                // Aplicar escala de tamaño Dinámica (!grande / !chiquito)
+                ctx.translate(posX + (24 * this.escala), posY + (24 * this.escala));
+                ctx.scale(this.escala, this.escala);
+                ctx.translate(-(posX + 24), -(posY + 24));
+
+                // Torso
+                ctx.fillStyle = this.colorCuerpo;
+                ctx.fillRect(posX + 8, posY + 16, 32, 24); 
+
+                // Cabeza
+                ctx.fillStyle = this.colorDetalle;
+                ctx.fillRect(posX + 12, posY + 4, 24, 14); 
+                
+                // Ojos
                 ctx.fillStyle = '#FFFFFF';
                 ctx.fillRect(posX + 16, posY + 8, 6, 4);
                 ctx.fillRect(posX + 26, posY + 8, 6, 4);
 
-                // Pierna izquierda y derecha animadas alternativamente
+                // Piernas
                 ctx.fillStyle = '#111111';
                 ctx.fillRect(posX + 12, posY + 40, 6, 8 + this.offsetPierna); 
                 ctx.fillRect(posX + 30, posY + 40, 6, 8 - this.offsetPierna);
 
-                // 2. DIBUJAR TEXTO DEL NOMBRE DEL USUARIO
+                // DIBUJAR ESPADA SI ESTÁ EN !PELEA
+                if (this.peleando) {
+                    ctx.fillStyle = '#E0E0E0'; // Hoja metálica
+                    const dirEspada = this.velocidad >= 0 ? 1 : -1;
+                    const espadaX = dirEspada === 1 ? posX + 40 : posX - 12;
+                    ctx.fillRect(espadaX, posY + 18, 16 * dirEspada, 6);
+                    ctx.fillStyle = '#8B5A2B'; // Empuñadura madera
+                    ctx.fillRect(dirEspada === 1 ? espadaX : espadaX, posY + 16, 2 * dirEspada, 10);
+                }
+
+                ctx.restore();
+
+                // Dibujar Nombre separado de la escala para que sea legible siempre
+                ctx.save();
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
                 ctx.font = 'bold 13px sans-serif';
                 const anchoTexto = ctx.measureText(this.nombre).width;
                 
-                // Fondo del recuadro del nombre
-                ctx.fillRect(posX + 24 - (anchoTexto / 2) - 6, posY - 22, anchoTexto + 12, 20);
+                // Ajustamos la altura del recuadro del nombre según lo alto que sea el muñeco
+                const offsetNombreY = 25 * this.escala;
+                ctx.fillRect(posX + (24 * this.escala) - (anchoTexto / 2) - 6, posY - offsetNombreY, anchoTexto + 12, 20);
                 
-                // Texto blanco
                 ctx.fillStyle = '#FFFFFF';
                 ctx.textAlign = 'center';
-                ctx.fillText(this.nombre, posX + 24, posY - 8);
-
+                ctx.fillText(this.nombre, posX + (24 * this.escala), posY - offsetNombreY + 14);
                 ctx.restore();
             }
 
             saltar() {
-                if (this.enElSuelo) {
-                    this.velocidadY = 9; // Impulso inicial hacia arriba
+                if (this.enElSuelo && !this.explotando) {
+                    this.velocidadY = 9; 
                     this.enElSuelo = false;
+                }
+            }
+
+            atacar() {
+                this.peleando = true;
+                this.timerPelea = Date.now() + 1200; // La pelea dura 1.2 segundos
+                
+                // Detectar si golpea a otros avatares cercanos
+                const rangoAtaque = 70 * this.escala;
+                for (let otroId in avatares) {
+                    if (otroId === this.id) continue;
+                    const enemigo = avatares[otroId];
+                    const distancia = Math.abs((this.x + 24) - (enemigo.x + 24));
+                    
+                    if (distancia < rangoAtaque) {
+                        // ¡Mandamos volando al enemigo atacado!
+                        enemigo.velocidadY = 10;
+                        enemigo.enElSuelo = false;
+                        enemigo.velocidad = (enemigo.x > this.x ? 3 : -3); // Empujón lateral huyendo
+                    }
+                }
+            }
+
+            explotar() {
+                this.explotando = true;
+                const posX = this.x + (24 * this.escala);
+                const posY = this.y + (20 * this.escala) - this.altoSalto;
+                
+                // Generar partículas proporcionales a su escala
+                const totalParticulas = 35 * this.escala;
+                for (let i = 0; i < totalParticulas; i++) {
+                    const color = Math.random() > 0.5 ? this.colorCuerpo : this.colorDetalle;
+                    particulas.push(new ParticulaPixel(posX, posY, color));
                 }
             }
         }
 
-        // Bucle de renderizado continuo (60 FPS estables de dibujo sobre el lienzo)
+        // Motor ciclo gráfico de renderizado (60 FPS)
         function bucleGamer() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             
             const tiempoActual = Date.now();
+            
+            // Procesar Avatares activos
             for (let id in avatares) {
                 const avatar = avatares[id];
                 
-                // Si el espectador pasa más de 3 minutos (180000 ms) sin hablar, su avatar se retira limpiamente
-                if (tiempoActual - avatar.timerVida > 180000) {
-                    delete avatares[id];
+                // Temporizador de 30 segundos (30000ms)
+                if (tiempoActual - avatar.timerVida > 30000 && !avatar.explotando) {
+                    avatar.explotar();
+                    setTimeout(() => { delete avatares[id]; }, 50);
                     continue;
                 }
 
                 avatar.actualizar();
                 avatar.dibujar();
             }
+
+            // Procesar Partículas
+            for (let i = particulas.length - 1; i >= 0; i--) {
+                particulas[i].actualizar();
+                particulas[i].dibujar();
+                if (particulas[i].alfa <= 0) particulas.splice(i, 1);
+            }
+
             requestAnimationFrame(bucleGamer);
         }
         bucleGamer();
 
-        // CONEXIÓN AL CHAT DE TWITCH VIA WEBSOCKET DIRECTO
+        // CONEXIÓN DIRECTA A TWITCH CHAT VIA WEBSOCKET
         const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
 
         ws.onopen = () => {
             ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
-            ws.send('NICK justinfan99823'); // Entrada de lectura anónima universal
+            ws.send('NICK justinfan99823'); 
             ws.send(`JOIN #${canal}`);
         };
 
@@ -176,33 +275,37 @@
                 const usuario = displayMatch ? displayMatch[1] : 'Espectador';
                 const idUsuario = userIdMatch ? userIdMatch[1] : usuario;
 
-                // Extraemos el texto exacto enviado por el usuario
                 const partesMensaje = msg.split(`PRIVMSG #${canal} :`);
                 const textoChat = partesMensaje[1] ? partesMensaje[1].trim().toLowerCase() : '';
 
-                // Si el personaje no existe, lo creamos de inmediato en el mapa
                 if (!avatares[idUsuario]) {
                     avatares[idUsuario] = new PixelAvatar(idUsuario, usuario);
                 } else {
-                    // Si ya existía, refrescamos su temporizador de vida activa
-                    avatares[idUsuario].timerVida = Date.now();
+                    avatares[idUsuario].timerVida = Date.now(); // Refrescar los 30s de vida al hablar
                 }
 
                 const personaje = avatares[idUsuario];
 
-                // EVALUACIÓN DE INTERACTIVIDAD POR COMANDOS
+                // PROCESADOR COMPLETO DE INSTRUCCIONES
                 if (textoChat.startsWith('!saltar')) {
                     personaje.saltar();
                 } else if (textoChat.startsWith('!correr')) {
-                    // Duplica su velocidad actual (máximo establecido para evitar desfases rápidos)
-                    if (Math.abs(personaje.velocidad) < 2) personaje.velocidad *= 2.2;
+                    if (Math.abs(personaje.velocidad) < 3) personaje.velocidad *= 2.2;
                 } else if (textoChat.startsWith('!parar')) {
                     personaje.velocidad = 0;
+                } else if (textoChat.startsWith('!pelea')) {
+                    personaje.atacar();
+                } else if (textoChat.startsWith('!grande')) {
+                    personaje.escala = 2.0; // Gigante
+                } else if (textoChat.startsWith('!chiquito')) {
+                    personaje.escala = 0.5; // Enano
+                } else if (textoChat.startsWith('!color')) {
+                    personaje.colorCuerpo = `hsl(${Math.random() * 360}, 85%, 55%)`;
+                    personaje.colorDetalle = `hsl(${Math.random() * 360}, 90%, 40%)`;
                 } else {
-                    // Si escribe un mensaje normal, hace un pequeño salto de alegría automáticamente
+                    // Si escribe un mensaje normal, da un brinco de alegría
                     personaje.saltar();
-                    // Si estaba parado, vuelve a caminar de forma aleatoria
-                    if (personaje.velocidad === 0) personaje.velocidad = Math.random() > 0.5 ? 0.6 : -0.6;
+                    if (personaje.velocidad === 0) personaje.velocidad = Math.random() > 0.5 ? 0.7 : -0.7;
                 }
             }
 

@@ -116,8 +116,10 @@
                 }
             }
         }
+        
         function bucle() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
+            dibujarInterfazAyuda();
             const ahora = Date.now();
             for (let id in avatares) {
                 const av = avatares[id];
@@ -144,10 +146,10 @@
             if (msg.includes('PRIVMSG')) {
                 const displayMatch = msg.match(/display-name=([^;]+)/);
                 const userIdMatch = msg.match(/user-id=(\d+)/);
-                const usuario = displayMatch ? displayMatch : 'Espectador';
-                const idUsuario = userIdMatch ? userIdMatch : usuario;
+                const usuario = displayMatch ? displayMatch[1] : 'Espectador';
+                const idUsuario = userIdMatch ? userIdMatch[1] : usuario;
                 const partes = msg.split(`PRIVMSG #${canal} :`);
-                const txt = partes ? partes.trim().toLowerCase() : '';
+                const txt = partes[1] ? partes[1].trim().toLowerCase() : '';
 
                 if (!avatares[idUsuario]) avatares[idUsuario] = new PixelAvatar(idUsuario, usuario);
                 else avatares[idUsuario].timerVida = Date.now();

@@ -1,316 +1,166 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <title>Pixel Art Avatars Interactivos - PapaPayaso</title>
-    <style>
-        body, html {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            background-color: transparent; /* Transparente para OBS */
-            width: 100vw;
-            height: 100vh;
-        }
-        canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-            image-rendering: pixelated; /* Look retro de 8 bits */
-        }
-    </style>
-</head>
-<body>
+Pixel Art Pro - PapaPayaso
 
-    <canvas id="canvasStream"></canvas>
+body, html { margin: 0; padding: 0; overflow: hidden; background: transparent; width: 100vw; height: 100vh; }
+canvas { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
 
-    <script>
-        const canal = 'papapayaso';
-        const canvas = document.getElementById('canvasStream');
-        const ctx = canvas.getContext('2d');
 
-        function ajustarPantalla() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        ajustarPantalla();
-        window.addEventListener('resize', ajustarPantalla);
 
-        const avatares = {};
-        const particulas = [];
 
-        // Clase para las partículas de la explosión
-        class ParticulaPixel {
-            constructor(x, y, color) {
-                this.x = x;
-                this.y = y;
-                this.color = color;
-                this.vx = (Math.random() - 0.5) * 7;
-                this.vy = (Math.random() - 0.8) * 9;
-                this.size = Math.random() * 3 + 2;
-                this.alfa = 1;
-                this.gravedad = 0.25;
-            }
-            actualizar() {
-                this.x += this.vx;
-                this.vy += this.gravedad;
-                this.y += this.vy;
-                this.alfa -= 0.02;
-            }
-            dibujar() {
-                ctx.save();
-                ctx.globalAlpha = this.alfa;
-                ctx.fillStyle = this.color;
-                ctx.fillRect(this.x, this.y, this.size, this.size);
-                ctx.restore();
-            }
-        }
 
-        // Clase principal del Avatar
-        class PixelAvatar {
-            constructor(id, nombre) {
-                this.id = id;
-                this.nombre = nombre;
-                this.x = Math.random() * (canvas.width - 60);
-                this.y = canvas.height - 85; 
-                this.velocidad = (Math.random() * 0.8 + 0.4) * (Math.random() > 0.5 ? 1 : -1);
-                this.altoSalto = 0;
-                this.velocidadY = 0;
-                this.enElSuelo = true;
-                this.timerVida = Date.now();
-                this.explotando = false;
-                
-                // Estados de escala y pelea
-                this.escala = 1.0;
-                this.peleando = false;
-                this.timerPelea = 0;
-
-                this.colorCuerpo = `hsl(${Math.random() * 360}, 85%, 55%)`;
-                this.colorDetalle = `hsl(${Math.random() * 360}, 90%, 40%)`;
-                this.offsetPierna = 0;
-            }
-
-            actualizar() {
-                if (this.explotando) return;
-
-                this.x += this.velocidad;
-                
-                // Rebotar bordes teniendo en cuenta la escala de tamaño
-                const anchoActual = 50 * this.escala;
-                if (this.x < 0) { this.x = 0; this.velocidad *= -1; }
-                if (this.x > canvas.width - anchoActual) { this.x = canvas.width - anchoActual; this.velocidad *= -1; }
-
-                // Física de salto
-                if (!this.enElSuelo) {
-                    this.altoSalto += this.velocidadY;
-                    this.velocidadY -= 0.5; 
-                    if (this.altoSalto <= 0) {
-                        this.altoSalto = 0;
-                        this.velocidadY = 0;
-                        this.enElSuelo = true;
-                    }
-                }
-
-                // Piernas animadas
-                if (Math.abs(this.velocidad) > 0.1) {
-                    this.offsetPierna = Math.sin(Date.now() * 0.015) * 4;
-                } else {
-                    this.offsetPierna = 0;
-                }
-
-                // Controlar estado de ataque !pelea
-                if (this.peleando && Date.now() > this.timerPelea) {
-                    this.peleando = false;
-                }
-            }
-
-            dibujar() {
-                if (this.explotando) return;
-
-                const posX = this.x;
-                const posY = this.y - this.altoSalto;
-
-                ctx.save();
-                
-                // Aplicar escala de tamaño Dinámica (!grande / !chiquito)
-                ctx.translate(posX + (24 * this.escala), posY + (24 * this.escala));
-                ctx.scale(this.escala, this.escala);
-                ctx.translate(-(posX + 24), -(posY + 24));
-
-                // Torso
-                ctx.fillStyle = this.colorCuerpo;
-                ctx.fillRect(posX + 8, posY + 16, 32, 24); 
-
-                // Cabeza
-                ctx.fillStyle = this.colorDetalle;
-                ctx.fillRect(posX + 12, posY + 4, 24, 14); 
-                
-                // Ojos
-                ctx.fillStyle = '#FFFFFF';
-                ctx.fillRect(posX + 16, posY + 8, 6, 4);
-                ctx.fillRect(posX + 26, posY + 8, 6, 4);
-
-                // Piernas
-                ctx.fillStyle = '#111111';
-                ctx.fillRect(posX + 12, posY + 40, 6, 8 + this.offsetPierna); 
-                ctx.fillRect(posX + 30, posY + 40, 6, 8 - this.offsetPierna);
-
-                // DIBUJAR ESPADA SI ESTÁ EN !PELEA
-                if (this.peleando) {
-                    ctx.fillStyle = '#E0E0E0'; // Hoja metálica
-                    const dirEspada = this.velocidad >= 0 ? 1 : -1;
-                    const espadaX = dirEspada === 1 ? posX + 40 : posX - 12;
-                    ctx.fillRect(espadaX, posY + 18, 16 * dirEspada, 6);
-                    ctx.fillStyle = '#8B5A2B'; // Empuñadura madera
-                    ctx.fillRect(dirEspada === 1 ? espadaX : espadaX, posY + 16, 2 * dirEspada, 10);
-                }
-
-                ctx.restore();
-
-                // Dibujar Nombre separado de la escala para que sea legible siempre
-                ctx.save();
-                ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-                ctx.font = 'bold 13px sans-serif';
-                const anchoTexto = ctx.measureText(this.nombre).width;
-                
-                // Ajustamos la altura del recuadro del nombre según lo alto que sea el muñeco
-                const offsetNombreY = 25 * this.escala;
-                ctx.fillRect(posX + (24 * this.escala) - (anchoTexto / 2) - 6, posY - offsetNombreY, anchoTexto + 12, 20);
-                
-                ctx.fillStyle = '#FFFFFF';
-                ctx.textAlign = 'center';
-                ctx.fillText(this.nombre, posX + (24 * this.escala), posY - offsetNombreY + 14);
-                ctx.restore();
-            }
-
-            saltar() {
-                if (this.enElSuelo && !this.explotando) {
-                    this.velocidadY = 9; 
-                    this.enElSuelo = false;
-                }
-            }
-
-            atacar() {
-                this.peleando = true;
-                this.timerPelea = Date.now() + 1200; // La pelea dura 1.2 segundos
-                
-                // Detectar si golpea a otros avatares cercanos
-                const rangoAtaque = 70 * this.escala;
-                for (let otroId in avatares) {
-                    if (otroId === this.id) continue;
-                    const enemigo = avatares[otroId];
-                    const distancia = Math.abs((this.x + 24) - (enemigo.x + 24));
-                    
-                    if (distancia < rangoAtaque) {
-                        // ¡Mandamos volando al enemigo atacado!
-                        enemigo.velocidadY = 10;
-                        enemigo.enElSuelo = false;
-                        enemigo.velocidad = (enemigo.x > this.x ? 3 : -3); // Empujón lateral huyendo
-                    }
-                }
-            }
-
-            explotar() {
-                this.explotando = true;
-                const posX = this.x + (24 * this.escala);
-                const posY = this.y + (20 * this.escala) - this.altoSalto;
-                
-                // Generar partículas proporcionales a su escala
-                const totalParticulas = 35 * this.escala;
-                for (let i = 0; i < totalParticulas; i++) {
-                    const color = Math.random() > 0.5 ? this.colorCuerpo : this.colorDetalle;
-                    particulas.push(new ParticulaPixel(posX, posY, color));
-                }
-            }
-        }
-
-        // Motor ciclo gráfico de renderizado (60 FPS)
-        function bucleGamer() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            
-            const tiempoActual = Date.now();
-            
-            // Procesar Avatares activos
-            for (let id in avatares) {
-                const avatar = avatares[id];
-                
-                // Temporizador de 30 segundos (30000ms)
-                if (tiempoActual - avatar.timerVida > 30000 && !avatar.explotando) {
-                    avatar.explotar();
-                    setTimeout(() => { delete avatares[id]; }, 50);
-                    continue;
-                }
-
-                avatar.actualizar();
-                avatar.dibujar();
-            }
-
-            // Procesar Partículas
-            for (let i = particulas.length - 1; i >= 0; i--) {
-                particulas[i].actualizar();
-                particulas[i].dibujar();
-                if (particulas[i].alfa <= 0) particulas.splice(i, 1);
-            }
-
-            requestAnimationFrame(bucleGamer);
-        }
-        bucleGamer();
-
-        // CONEXIÓN DIRECTA A TWITCH CHAT VIA WEBSOCKET
-        const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
-
-        ws.onopen = () => {
-            ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
-            ws.send('NICK justinfan99823'); 
-            ws.send(`JOIN #${canal}`);
-        };
-
-        ws.onmessage = (event) => {
-            const msg = event.data;
-
-            if (msg.includes('PRIVMSG')) {
-                const displayMatch = msg.match(/display-name=([^;]+)/);
-                const userIdMatch = msg.match(/user-id=(\d+)/);
-                
-                const usuario = displayMatch ? displayMatch[1] : 'Espectador';
-                const idUsuario = userIdMatch ? userIdMatch[1] : usuario;
-
-                const partesMensaje = msg.split(`PRIVMSG #${canal} :`);
-                const textoChat = partesMensaje[1] ? partesMensaje[1].trim().toLowerCase() : '';
-
-                if (!avatares[idUsuario]) {
-                    avatares[idUsuario] = new PixelAvatar(idUsuario, usuario);
-                } else {
-                    avatares[idUsuario].timerVida = Date.now(); // Refrescar los 30s de vida al hablar
-                }
-
-                const personaje = avatares[idUsuario];
-
-                // PROCESADOR COMPLETO DE INSTRUCCIONES
-                if (textoChat.startsWith('!saltar')) {
-                    personaje.saltar();
-                } else if (textoChat.startsWith('!correr')) {
-                    if (Math.abs(personaje.velocidad) < 3) personaje.velocidad *= 2.2;
-                } else if (textoChat.startsWith('!parar')) {
-                    personaje.velocidad = 0;
-                } else if (textoChat.startsWith('!pelea')) {
-                    personaje.atacar();
-                } else if (textoChat.startsWith('!grande')) {
-                    personaje.escala = 2.0; // Gigante
-                } else if (textoChat.startsWith('!chiquito')) {
-                    personaje.escala = 0.5; // Enano
-                } else if (textoChat.startsWith('!color')) {
-                    personaje.colorCuerpo = `hsl(${Math.random() * 360}, 85%, 55%)`;
-                    personaje.colorDetalle = `hsl(${Math.random() * 360}, 90%, 40%)`;
-                } else {
-                    // Si escribe un mensaje normal, da un brinco de alegría
-                    personaje.saltar();
-                    if (personaje.velocidad === 0) personaje.velocidad = Math.random() > 0.5 ? 0.7 : -0.7;
-                }
-            }
-
-            if (msg.startsWith('PING')) ws.send('PONG :tmi.twitch.tv');
-        };
-    </script>
-</body>
-</html>
+const canal = 'papapayaso';
+const canvas = document.getElementById('canvasStream');
+const ctx = canvas.getContext('2d');
+const avatares = {}, particulas = [];
+function ajustar() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+ajustar(); window.addEventListener('resize', ajustar);
+class Particula {
+constructor(x, y, col) {
+this.x = x; this.y = y; this.col = col;
+this.vx = (Math.random() - 0.5) * 6; this.vy = (Math.random() - 0.8) * 8;
+this.size = Math.random() * 3 + 2; this.alfa = 1;
+}
+act() { this.x += this.vx; this.vy += 0.25; this.y += this.vy; this.alfa -= 0.02; }
+dib() { ctx.save(); ctx.globalAlpha = this.alfa; ctx.fillStyle = this.col; ctx.fillRect(this.x, this.y, this.size, this.size); ctx.restore(); }
+}
+class PixelAvatar {
+constructor(id, nombre) {
+this.id = id; this.nombre = nombre;
+this.x = Math.random() * (canvas.width - 60); this.y = canvas.height - 85;
+this.velX = (Math.random() * 0.8 + 0.4) * (Math.random() > 0.5 ? 1 : -1);
+this.jumpY = 0; this.velY = 0; this.enSuelo = true;
+this.timerVida = Date.now(); this.explotando = false;
+this.escala = 1.0; this.peleando = false; this.timerPelea = 0;
+this.hue = Math.random() * 360;
+this.c1 = hsl(${this.hue}, 85%, 50%);
+this.c2 = hsl(${this.hue}, 85%, 35%);
+this.c3 = hsl(${(this.hue+150)%360}, 90%, 45%);
+this.c4 = hsl(${(this.hue+150)%360}, 90%, 30%);
+}
+act() {
+if (this.explotando) return;
+this.x += this.velX;
+let w = 48 * this.escala;
+if (this.x < 0) { this.x = 0; this.velX *= -1; }
+if (this.x > canvas.width - w) { this.x = canvas.width - w; this.velX *= -1; }
+if (!this.enSuelo) {
+this.jumpY += this.velY; this.velY -= 0.5;
+if (this.jumpY <= 0) { this.jumpY = 0; this.velY = 0; this.enSuelo = true; }
+}
+if (this.peleando && Date.now() > this.timerPelea) this.peleando = false;
+}
+dib() {
+if (this.explotando) return;
+const px = this.x, py = this.y - this.jumpY;
+ctx.save();
+ctx.translate(px + (24 * this.escala), py + (24 * this.escala));
+ctx.scale(this.escala, this.escala);
+ctx.translate(-(px + 24), -(py + 24));
+ctx.fillStyle = this.c1; ctx.fillRect(px + 8, py + 16, 32, 24);
+ctx.fillStyle = this.c2; ctx.fillRect(px + 8, py + 32, 32, 8);
+ctx.fillRect(px + 32, py + 16, 8, 24);
+ctx.fillStyle = this.c1; ctx.fillRect(px + 12, py + 4, 24, 14);
+ctx.fillStyle = this.c2; ctx.fillRect(px + 12, py + 14, 24, 4);
+ctx.fillStyle = this.c3; ctx.fillRect(px + 8, py + 6, 4, 10);
+ctx.fillRect(px + 36, py + 6, 4, 10);
+ctx.fillStyle = this.c4; ctx.fillRect(px + 36, py + 11, 4, 5);
+ctx.fillStyle = this.c3; ctx.fillRect(px + 14, py + 2, 20, 2);
+ctx.fillStyle = '#00ffff'; ctx.fillRect(px + 16, py + 7, 16, 5);
+ctx.fillStyle = '#ffffff'; ctx.fillRect(px + 18, py + 8, 4, 2);
+let op = Math.abs(this.velX) > 0.1 ? Math.sin(Date.now() * 0.015) * 4 : 0;
+ctx.fillStyle = '#1c1c1e';
+ctx.fillRect(px + 14, py + 40, 6, 8 + op); ctx.fillRect(px + 28, py + 40, 6, 8 - op);
+if (this.peleando) {
+let dir = this.velX >= 0 ? 1 : -1;
+let ex = dir === 1 ? px + 40 : px - 16;
+ctx.fillStyle = '#5a5a5a'; ctx.fillRect(ex, py + 18, 16 * dir, 6);
+ctx.fillStyle = '#dcdcdc'; ctx.fillRect(ex, py + 19, 16 * dir, 3);
+ctx.fillStyle = '#ffd700'; ctx.fillRect(dir === 1 ? ex : ex - 2, py + 15, 2 * dir, 12);
+ctx.fillStyle = '#8b5a2b'; ctx.fillRect(dir === 1 ? ex - 4 : ex + 16, py + 20, 4 * dir, 3);
+}
+ctx.restore();
+ctx.save(); ctx.fillStyle = 'rgba(0, 0, 0, 0.75)'; ctx.font = 'bold 13px sans-serif';
+const tw = ctx.measureText(this.nombre).width;
+const offY = 28 * this.escala;
+ctx.fillRect(px + (24 * this.escala) - (tw / 2) - 6, py - offY, tw + 12, 20);
+ctx.fillStyle = '#FFFFFF'; ctx.textAlign = 'center';
+ctx.fillText(this.nombre, px + (24 * this.escala), py - offY + 14);
+ctx.restore();
+}
+saltar() { if (this.enSuelo && !this.explotando) { this.velY = 9; this.enSuelo = false; } }
+atacar() {
+this.peleando = true; this.timerPelea = Date.now() + 1200;
+for (let oId in avatares) {
+if (oId === this.id) continue;
+const e = avatares[oId];
+if (Math.abs((this.x + 24) - (e.x + 24)) < 70 * this.escala) {
+e.velY = 10; e.enSuelo = false; e.velX = (e.x > this.x ? 3 : -3);
+}
+}
+}
+explotar() {
+this.explotando = true;
+for (let i = 0; i < 40 * this.escala; i++) {
+particulas.push(new Particula(this.x + (24this.escala), this.y + (20this.escala) - this.jumpY, Math.random() > 0.5 ? this.c1 : this.c3));
+}
+}
+}
+function dibujarInterfazAyuda() {
+ctx.save();
+ctx.fillStyle = 'rgba(20, 20, 20, 0.85)';
+ctx.strokeStyle = '#9146FF'; ctx.lineWidth = 2;
+ctx.fillRect(15, 15, 490, 28); ctx.strokeRect(15, 15, 490, 28);
+ctx.fillStyle = '#ffffff'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'left';
+ctx.fillText("🎮 COMANDOS AVATAR: !saltar !correr !parar !color !grande !chiquito !pelea", 25, 33);
+ctx.restore();
+}
+function bucle() {
+ctx.clearRect(0, 0, canvas.width, canvas.height);
+dibujarInterfazAyuda();
+const ahora = Date.now();
+for (let id in avatares) {
+const av = avatares[id];
+if (ahora - av.timerVida > 30000 && !av.explotando) {
+av.explotar(); setTimeout(() => { delete avatares[id]; }, 50); continue;
+}
+av.act(); av.dib();
+}
+for (let i = particulas.length - 1; i >= 0; i--) {
+particulas[i].act(); particulas[i].dib();
+if (particulas[i].alfa <= 0) particulas.splice(i, 1);
+}
+requestAnimationFrame(bucle);
+}
+bucle();
+const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
+ws.onopen = () => {
+ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
+ws.send('NICK justinfan99823'); ws.send(JOIN #${canal});
+};
+ws.onmessage = (ev) => {
+const msg = ev.data;
+if (msg.includes('PRIVMSG')) {
+const displayMatch = msg.match(/display-name=([^;]+)/);
+const userIdMatch = msg.match(/user-id=(\d+)/);
+const usuario = displayMatch ? displayMatch[1] : 'Espectador';
+const idUsuario = userIdMatch ? userIdMatch[1] : usuario;
+const partes = msg.split(PRIVMSG #${canal} :);
+const txt = partes[1] ? partes[1].trim().toLowerCase() : '';
+if (!avatares[idUsuario]) avatares[idUsuario] = new PixelAvatar(idUsuario, usuario);
+else avatares[idUsuario].timerVida = Date.now();
+const p = avatares[idUsuario];
+if (txt.startsWith('!saltar')) p.saltar();
+else if (txt.startsWith('!correr')) { if (Math.abs(p.velX) < 3) p.velX *= 2.2; }
+else if (txt.startsWith('!parar')) p.velX = 0;
+else if (txt.startsWith('!pelea')) p.atacar();
+else if (txt.startsWith('!grande')) p.escala = 2.0;
+else if (txt.startsWith('!chiquito')) p.escala = 0.5;
+else if (txt.startsWith('!color')) {
+p.hue = Math.random() * 360;
+p.c1 = hsl(${p.hue}, 85%, 50%); p.c2 = hsl(${p.hue}, 85%, 35%);
+p.c3 = hsl(${(p.hue+150)%360}, 90%, 45%); p.c4 = hsl(${(p.hue+150)%360}, 90%, 30%);
+} else {
+p.saltar(); if (p.velX === 0) p.velX = Math.random() > 0.5 ? 0.7 : -0.7;
+}
+}
+if (msg.startsWith('PING')) ws.send('PONG :tmi.twitch.tv');
+};

@@ -116,19 +116,8 @@
                 }
             }
         }
-        function dibujarInterfazAyuda() {
-            ctx.save();
-            ctx.fillStyle = 'rgba(20, 20, 20, 0.85)';
-            ctx.strokeStyle = '#9146FF'; ctx.lineWidth = 2;
-            ctx.fillRect(15, 15, 490, 28); ctx.strokeRect(15, 15, 490, 28);
-            ctx.fillStyle = '#ffffff'; ctx.font = 'bold 12px monospace'; ctx.textAlign = 'left';
-            ctx.fillText("🎮 COMANDOS AVATAR: !saltar !correr !parar !color !grande !chiquito !pelea", 25, 33);
-            ctx.restore();
-        }
-
         function bucle() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            dibujarInterfazAyuda();
             const ahora = Date.now();
             for (let id in avatares) {
                 const av = avatares[id];
@@ -155,10 +144,10 @@
             if (msg.includes('PRIVMSG')) {
                 const displayMatch = msg.match(/display-name=([^;]+)/);
                 const userIdMatch = msg.match(/user-id=(\d+)/);
-                const usuario = displayMatch ? displayMatch[1] : 'Espectador';
-                const idUsuario = userIdMatch ? userIdMatch[1] : usuario;
+                const usuario = displayMatch ? displayMatch : 'Espectador';
+                const idUsuario = userIdMatch ? userIdMatch : usuario;
                 const partes = msg.split(`PRIVMSG #${canal} :`);
-                const txt = partes[1] ? partes[1].trim().toLowerCase() : '';
+                const txt = partes ? partes.trim().toLowerCase() : '';
 
                 if (!avatares[idUsuario]) avatares[idUsuario] = new PixelAvatar(idUsuario, usuario);
                 else avatares[idUsuario].timerVida = Date.now();

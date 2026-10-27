@@ -2,138 +2,211 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Overlay PapaPayaso - Emotes Activos</title>
+    <title>Pixel Art Avatars - PapaPayaso</title>
     <style>
-        body {
+        body, html {
             margin: 0;
             padding: 0;
             overflow: hidden;
-            background-color: transparent; /* Totalmente transparente para OBS */
-            font-family: 'Segoe UI', Arial, sans-serif;
-        }
-        #contenedor {
-            position: relative;
+            background-color: transparent; /* Transparente para OBS */
             width: 100vw;
             height: 100vh;
         }
-        .avatar-box {
-            position: absolute;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            animation: saltar 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-        }
-        .avatar-img {
-            width: 65px;
-            height: 65px;
-            border-radius: 50%;
-            border: 3px solid #9146FF; /* Borde morado de Twitch */
-            box-shadow: 0px 4px 10px rgba(0,0,0,0.5);
-            background: #18181b;
-            object-fit: contain;
-        }
-        .avatar-name {
-            background: rgba(14, 14, 16, 0.9);
-            color: #fff;
-            padding: 2px 8px;
-            border-radius: 10px;
-            font-size: 13px;
-            margin-top: 5px;
-            font-weight: bold;
-            white-space: nowrap;
-            border: 1px solid #3f3f46;
-        }
-        @keyframes saltar {
-            0% { transform: scale(0) translateY(30px); opacity: 0; }
-            100% { transform: scale(1) translateY(0); opacity: 1; }
-        }
-        .fade-out {
-            transition: all 0.5s ease;
-            transform: scale(0.5) translateY(-30px);
-            opacity: 0;
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: pixelated; /* Mantiene el look retro de consola antigua */
         }
     </style>
 </head>
 <body>
 
-    <div id="contenedor"></div>
+    <canvas id="canvasStream"></canvas>
 
     <script>
         const canal = 'papapayaso';
-        const contenedor = document.getElementById('contenedor');
+        const canvas = document.getElementById('canvasStream');
+        const ctx = canvas.getContext('2d');
 
-        // Conexión segura WebSocket nativa con el servidor central de Twitch
+        // Ajustar resolución del lienzo
+        function ajustarPantalla() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        ajustarPantalla();
+        window.addEventListener('resize', ajustarPantalla);
+
+        // Almacén de avatares activos
+        const avatares = {};
+
+        // Clase principal para dibujar y mover cada muñeco Pixel Art
+        class PixelAvatar {
+            constructor(id, nombre) {
+                this.id = id;
+                this.nombre = nombre;
+                this.x = Math.random() * (canvas.width - 60);
+                // Camina justo en el borde inferior (suelo simulado)
+                this.y = canvas.height - 85; 
+                this.velocidad = (Math.random() * 0.8 + 0.4) * (Math.random() > 0.5 ? 1 : -1);
+                this.altoSalto = 0;
+                this.velocidadY = 0;
+                this.enElSuelo = true;
+                this.timerVida = Date.now();
+                
+                // Matriz de color aleatoria única para este usuario
+                this.colorCuerpo = `hsl(${Math.random() * 360}, 85%, 55%)`;
+                this.colorDetalle = `hsl(${Math.random() * 360}, 90%, 40%)`;
+
+                // Animación de caminata básica por software
+                this.offsetPierna = 0;
+            }
+
+            actualizar() {
+                // Actualizar posición X (Caminar)
+                this.x += this.velocidad;
+                
+                // Rebotar en los bordes de la pantalla
+                if (this.x < 0) { this.x = 0; this.velocidad *= -1; }
+                if (this.x > canvas.width - 50) { this.x = canvas.width - 50; this.velocidad *= -1; }
+
+                // Física básica para el comando de Salto (!saltar)
+                if (!this.enElSuelo) {
+                    this.altoSalto += this.velocidadY;
+                    this.velocidadY -= 0.5; // Gravedad simulada
+                    if (this.altoSalto <= 0) {
+                        this.altoSalto = 0;
+                        this.velocidadY = 0;
+                        this.enElSuelo = true;
+                    }
+                }
+
+                // Oscilación de piernas al moverse
+                if (Math.abs(this.velocidad) > 0.1) {
+                    this.offsetPierna = Math.sin(Date.now() * 0.01) * 4;
+                } else {
+                    this.offsetPierna = 0;
+                }
+            }
+
+            dibujar() {
+                const posX = this.x;
+                const posY = this.y - this.altoSalto;
+
+                ctx.save();
+
+                // 1. DIBUJAR CUERPO PIXEL ART (Matriz de 8x8 píxeles simulada mediante bloques planos)
+                ctx.fillStyle = this.colorCuerpo;
+                ctx.fillRect(posX + 8, posY + 16, 32, 24); // Torso
+
+                ctx.fillStyle = this.colorDetalle;
+                ctx.fillRect(posX + 12, posY + 4, 24, 14); // Cabeza
+                
+                // Ojos robóticos brillantes (blancos)
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(posX + 16, posY + 8, 6, 4);
+                ctx.fillRect(posX + 26, posY + 8, 6, 4);
+
+                // Pierna izquierda y derecha animadas alternativamente
+                ctx.fillStyle = '#111111';
+                ctx.fillRect(posX + 12, posY + 40, 6, 8 + this.offsetPierna); 
+                ctx.fillRect(posX + 30, posY + 40, 6, 8 - this.offsetPierna);
+
+                // 2. DIBUJAR TEXTO DEL NOMBRE DEL USUARIO
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+                ctx.font = 'bold 13px sans-serif';
+                const anchoTexto = ctx.measureText(this.nombre).width;
+                
+                // Fondo del recuadro del nombre
+                ctx.fillRect(posX + 24 - (anchoTexto / 2) - 6, posY - 22, anchoTexto + 12, 20);
+                
+                // Texto blanco
+                ctx.fillStyle = '#FFFFFF';
+                ctx.textAlign = 'center';
+                ctx.fillText(this.nombre, posX + 24, posY - 8);
+
+                ctx.restore();
+            }
+
+            saltar() {
+                if (this.enElSuelo) {
+                    this.velocidadY = 9; // Impulso inicial hacia arriba
+                    this.enElSuelo = false;
+                }
+            }
+        }
+
+        // Bucle de renderizado continuo (60 FPS estables de dibujo sobre el lienzo)
+        function bucleGamer() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            const tiempoActual = Date.now();
+            for (let id in avatares) {
+                const avatar = avatares[id];
+                
+                // Si el espectador pasa más de 3 minutos (180000 ms) sin hablar, su avatar se retira limpiamente
+                if (tiempoActual - avatar.timerVida > 180000) {
+                    delete avatares[id];
+                    continue;
+                }
+
+                avatar.actualizar();
+                avatar.dibujar();
+            }
+            requestAnimationFrame(bucleGamer);
+        }
+        bucleGamer();
+
+        // CONEXIÓN AL CHAT DE TWITCH VIA WEBSOCKET DIRECTO
         const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
 
         ws.onopen = () => {
             ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
-            ws.send('NICK justinfan88374'); // Identificador de lectura anónima
+            ws.send('NICK justinfan99823'); // Entrada de lectura anónima universal
             ws.send(`JOIN #${canal}`);
-            console.log('Conexión nativa establecida con el chat de PapaPayaso');
         };
 
         ws.onmessage = (event) => {
-            const str = event.data;
-            
-            if (str.includes('PRIVMSG')) {
-                // Extracción de metadatos nativos mediante expresiones regulares estables
-                const displayMatch = str.match(/display-name=([^;]+)/);
-                const userIdMatch = str.match(/user-id=(\d+)/);
-                const emotesMatch = str.match(/emotes=([^;]+)/);
+            const msg = event.data;
+
+            if (msg.includes('PRIVMSG')) {
+                const displayMatch = msg.match(/display-name=([^;]+)/);
+                const userIdMatch = msg.match(/user-id=(\d+)/);
                 
                 const usuario = displayMatch ? displayMatch[1] : 'Espectador';
-                const userId = userIdMatch ? userIdMatch[1] : usuario;
+                const idUsuario = userIdMatch ? userIdMatch[1] : usuario;
 
-                // Evitamos duplicar avatares en la misma tanda
-                if (document.getElementById(`av-${userId}`)) return;
+                // Extraemos el texto exacto enviado por el usuario
+                const partesMensaje = msg.split(`PRIVMSG #${canal} :`);
+                const textoChat = partesMensaje[1] ? partesMensaje[1].trim().toLowerCase() : '';
 
-                // ASIGNACIÓN DE IMAGEN:
-                // Si el espectador incluye un emote en su mensaje, extraemos el ID del primer emote
-                let fotoUrl = '';
-                if (emotesMatch && emotesMatch[1]) {
-                    const primerEmoteId = emotesMatch[1].split(':')[0];
-                    // URL oficial de renderizado de CDN de Twitch para emotes en alta resolución (3.0)
-                    fotoUrl = `https://jtvnw.net{primerEmoteId}/default/dark/3.0`;
+                // Si el personaje no existe, lo creamos de inmediato en el mapa
+                if (!avatares[idUsuario]) {
+                    avatares[idUsuario] = new PixelAvatar(idUsuario, usuario);
                 } else {
-                    // Si escribe solo texto, generamos un avatar único, colorido y libre de bloqueos basado en su ID de usuario
-                    fotoUrl = `https://dicebear.com{userId}`;
+                    // Si ya existía, refrescamos su temporizador de vida activa
+                    avatares[idUsuario].timerVida = Date.now();
                 }
 
-                // Construcción del elemento gráfico en pantalla
-                const div = document.createElement('div');
-                div.id = `av-${userId}`;
-                div.className = 'avatar-box';
+                const personaje = avatares[idUsuario];
 
-                const img = document.createElement('img');
-                img.className = 'avatar-img';
-                img.src = fotoUrl;
-                
-                // Respaldo por si fallara el renderizado gráfico
-                img.onerror = () => { 
-                    img.src = 'https://jtvnw.net'; 
-                };
-
-                const nameDiv = document.createElement('div');
-                nameDiv.className = 'avatar-name';
-                nameDiv.innerText = usuario;
-
-                div.appendChild(img);
-                div.appendChild(nameDiv);
-                contenedor.appendChild(div);
-
-                // Posicionamiento en el tercio inferior de la transmisión
-                div.style.left = `${Math.random() * (window.innerWidth - 120)}px`;
-                div.style.top = `${(window.innerHeight * 0.7) + (Math.random() * (window.innerHeight * 0.16))}px`;
-
-                // Temporizador: se desvanece a los 8 segundos y se borra completamente
-                setTimeout(() => {
-                    div.classList.add('fade-out');
-                    setTimeout(() => div.remove(), 500);
-                }, 8000);
+                // EVALUACIÓN DE INTERACTIVIDAD POR COMANDOS
+                if (textoChat.startsWith('!saltar')) {
+                    personaje.saltar();
+                } else if (textoChat.startsWith('!correr')) {
+                    // Duplica su velocidad actual (máximo establecido para evitar desfases rápidos)
+                    if (Math.abs(personaje.velocidad) < 2) personaje.velocidad *= 2.2;
+                } else if (textoChat.startsWith('!parar')) {
+                    personaje.velocidad = 0;
+                } else {
+                    // Si escribe un mensaje normal, hace un pequeño salto de alegría automáticamente
+                    personaje.saltar();
+                    // Si estaba parado, vuelve a caminar de forma aleatoria
+                    if (personaje.velocidad === 0) personaje.velocidad = Math.random() > 0.5 ? 0.6 : -0.6;
+                }
             }
-            
-            // Mantener la conexión con el servidor respondiendo a los pings obligatorios de Twitch
-            if (str.startsWith('PING')) ws.send('PONG :tmi.twitch.tv');
+
+            if (msg.startsWith('PING')) ws.send('PONG :tmi.twitch.tv');
         };
     </script>
 </body>

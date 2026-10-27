@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Overlay PapaPayaso</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: transparent; /* Totalmente transparente para OBS */
+            font-family: Arial, sans-serif;
+        }
+        #contenedor {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        .avatar-box {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            animation: saltar 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        .avatar-img {
+            width: 65px;
+            height: 65px;
+            border-radius: 50%;
+            border: 3px solid #9146FF;
+            box-shadow: 0px 4px 10px rgba(0,0,0,0.5);
+            background: #18181b;
+        }
+        .avatar-name {
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 13px;
+            margin-top: 5px;
+            font-weight: bold;
+        }
+        @keyframes saltar {
+            0% { transform: scale(0) translateY(30px); opacity: 0; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .fade-out {
+            transition: all 0.5s ease;
+            transform: scale(0.5) translateY(-30px);
+            opacity: 0;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="contenedor"></div>
+
+    <script>
+        const canal = 'papapayaso';
+        const contenedor = document.getElementById('contenedor');
+
+        // Conexión limpia mediante una pasarela WebSocket estándar para evitar bloqueos locales
+        const ws = new WebSocket('wss://irc-ws.chat.twitch.tv:443');
+
+        ws.onopen = () => {
+            ws.send('CAP REQ :twitch.tv/tags twitch.tv/commands');
+            ws.send('NICK justinfan12345'); // Cuenta anónima de lectura de Twitch
+            ws.send(`JOIN #${canal}`);
+            console.log('Conectado de forma segura a Twitch');
+        };
+
+        ws.onmessage = (event) => {
+            const str = event.data;
+            if (str.includes('PRIVMSG')) {
+                // Extraer el nombre de usuario y su ID de los metadatos de Twitch
+                const displayMatch = str.match(/display-name=([^;]+)/);
+                const userMatch = str.match(/@username=([^;]+)/) || str.match(/:([^!]+)!/);
+                const userIdMatch = str.match(/user-id=(\d+)/);
+                
+                const usuario = displayMatch ? displayMatch[1] : 'Espectador';
+                const usernameMin = userMatch ? userMatch[1].toLowerCase() : '';
+                const userId = userIdMatch ? userIdMatch[1] : usuario;
+
+                // Si ya está en pantalla, no lo duplicamos
+                if (document.getElementById(`av-${userId}`)) return;
+
+                // Crear elementos del avatar usando una API de imágenes directa por HTTPS
+                const div = document.createElement('div');
+                div.id = `av-${userId}`;
+                div.className = 'avatar-box';
+
+                const img = document.createElement('img');
+                img.className = 'avatar-img';
+                img.src = `https://decapi.me{usernameMin}`;
+                
+                // Imagen por defecto si falla la carga
+                img.onerror = () => { 
+                    img.src = 'https://twitch.tv'; 
+                };
+
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'avatar-name';
+                nameDiv.innerText = usuario;
+
+                div.appendChild(img);
+                div.appendChild(nameDiv);
+                contenedor.appendChild(div);
+
+                // Posicionamiento en el tercio inferior
+                div.style.left = `${Math.random() * (window.innerWidth - 100)}px`;
+                div.style.top = `${(window.innerHeight * 0.7) + (Math.random() * (window.innerHeight * 0.15))}px`;
+
+                // Desaparecer tras 8 segundos
+                setTimeout(() => {
+                    div.classList.add('fade-out');
+                    setTimeout(() => div.remove(), 500);
+                }, 8000);
+            }
+            
+            // Responder al Ping de Twitch para mantener la conexión viva indefinidamente
+            if (str.startsWith('PING')) ws.send('PONG :tmi.twitch.tv');
+        };
+    </script>
+</body>
+</html>
